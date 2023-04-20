@@ -9,6 +9,7 @@ FROM NashvilleHousing
 
 
 -- Standardize Date Format
+-- Updated the table so that the saledate column is actually in date format and created a new date column.
 
 SELECT SaleDateConverted, CONVERT(Date,SaleDate)
 FROM NashvilleHousing
@@ -24,6 +25,7 @@ SET SaleDateConverted = CONVERT(Date,SaleDate)
 
 
 -- Populate Property Address data
+-- Used an ISNULL function so that if a.propertyaddress is null, then it'll populate with the b.propertyaddress.
 
 SELECT *
 FROM NashvilleHousing
@@ -47,6 +49,8 @@ WHERE a.PropertyAddress IS NULL
 
 
 -- Breaking our Address into Individual Columns (Address, City, State)
+-- Used substrings as a delimiter to separate the address from the city.
+-- Added a new address and city column, then updated the table to set their values.
 
 SELECT PropertyAddress
 FROM NashvilleHousing
@@ -73,7 +77,8 @@ SET PropertySplitCity = SUBSTRING(propertyaddress, CHARINDEX(',', propertyaddres
 SELECT *
 FROM NashvilleHousing
 
-
+-- Showing the method to split up the address, city, and state by using parsename instead of substrings.
+-- Added a new address, city, and state column, then updated the table to set their values.
 
 SELECT OwnerAddress
 FROM NashvilleHousing
@@ -106,7 +111,7 @@ SELECT *
 FROM NashvilleHousing
 
 
--- Change Y and N to Yes and No in "Sold as Vacant" field
+-- Change Y and N to Yes and No in "Sold as Vacant" field using CASE statement
 
 SELECT DISTINCT(soldasvacant), COUNT(SoldasVacant)
 FROM NashvilleHousing
@@ -128,6 +133,7 @@ SET SoldasVacant = CASE WHEN SoldasVacant = 'Y' THEN 'Yes'
 
 
 -- Remove Duplicates
+-- Used a CTE so that I could use a WHERE clause on the new column created from a PARTITION BY.
 
 WITH RowNumCTE AS(
 SELECT *,
