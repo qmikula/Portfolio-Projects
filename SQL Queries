@@ -159,7 +159,7 @@ CREATE VIEW v_Rolling_Six_Months_Sales AS
                     WHERE
                         order_date >= DATEADD(MONTH, -6, GETDATE())
                         AND
-                        item_id NOT LIKE '%Apparerl%'
+                        item_id NOT LIKE '%Apparel%'
                         AND
                         item_id NOT LIKE 'Needs Attention'
                         AND
