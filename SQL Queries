@@ -126,7 +126,7 @@ SELECT 'next_6_months' AS time_period, * FROM next_6_mo
 UNION ALL
 SELECT 'last_and_next_6_months' AS time_period, * FROM last_and_next_6_mo
 
-||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 --------------------------View for Rolling Six Month Sales--------------------------------
 CREATE VIEW v_Rolling_Six_Months_Sales AS
@@ -241,5 +241,79 @@ CREATE VIEW v_Rolling_Six_Months_Sales AS
     LEFT JOIN
         (SELECT item_id, [description] FROM Items) i ON final_dataset.item_id = i.item_id;
 
-||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+--------------------------Query for Expiring Ingredients--------------------------------
+SELECT
+	MOD.mo_id,
+        MBI.item_id,
+        MBI.description,
+        MO.memo,
+	MBI.bin_id,
+	MO.build_item_id,
+	MO.build_item_descr,
+	MBI.lot,
+	MBI.exp,
+	DATEDIFF(day, GETDATE(), MBI.exp) AS days_until_expiration,
+	CASE
+		WHEN MBI.exp BETWEEN GETDATE() - 89 AND GETDATE() -1 THEN ' Expired'
+		WHEN MBI.exp BETWEEN GETDATE() -1 AND GETDATE() + 31 THEN ' Month 1'
+		WHEN MBI.exp BETWEEN GETDATE() + 30 AND GETDATE() + 61 THEN 'Month 2'
+		WHEN MBI.exp BETWEEN GETDATE() + 60 AND GETDATE() + 91 THEN 'Month 3'
+		WHEN MBI.exp BETWEEN GETDATE() + 90 AND GETDATE() + 121 THEN 'Month 4'
+        WHEN MBI.exp BETWEEN GETDATE() + 120 AND GETDATE() + 151 THEN 'Month 5'
+		WHEN MBI.exp > GETDATE() + 150 THEN 'Month 6+'
+		ELSE 'N/A'
+	END AS 'exp month',
+	MO.start_date,
+	CASE
+           WHEN TRY_CONVERT(date, mo.start_date) >= CONVERT(date, GETDATE()) THEN mo.start_date
+           ELSE NULL
+	END AS filtered_start_date,
+	CASE
+                WHEN MO.start_date BETWEEN GETDATE() - 1 AND GETDATE() + 31 THEN ' Month 1'
+		WHEN MO.start_date BETWEEN GETDATE() + 30 AND GETDATE() + 61 THEN 'Month 2'
+		WHEN MO.start_date BETWEEN GETDATE() + 60 AND GETDATE() + 91 THEN 'Month 3'
+		WHEN MO.start_date BETWEEN GETDATE() + 90 AND GETDATE() + 121 THEN 'Month 4'
+        WHEN MO.start_date BETWEEN GETDATE() + 120 AND GETDATE() + 151 THEN 'Month 5'
+		WHEN MO.start_date > GETDATE() + 150 THEN 'Month 6+'
+		ELSE 'Previous'
+	END AS 'start month',
+	MBI.qty AS qty_onhand,
+	MOD.mo_required_qty AS qty_needed,
+        MO.ordered_qty,
+	MO.completed_qty,
+	MO.status,
+	MO.work_center,
+    MO.bom_item_id,
+	ICF.sales_channel,
+	ICF.customer,
+	ICF.category,
+	ICF.subcategory,
+	ICF.count,
+	ICF.potency,
+	ICF.flavor,
+	ICF.packaging_type,
+	ICF.raw_subcategory,
+	CONCAT(MBI.item_id,' | ',MBI.description) AS 'ItemIDDescription',
+	CONCAT(MOD.mo_id,' | ',MO.memo) AS MOIDMemo,
+    MOD.table_last_updated,
+	CASE
+		WHEN MBI.exp LIKE '2099%' THEN 'Yes'
+		ELSE 'No'
+	END AS 'Fake Exp?',
+	CONCAT(MBI.item_id,'-',MBI.exp) AS 'Conc Column',
+	(MBI.qty * I.cost_average) AS qty_value
+FROM dbo.Misys_Bin_Inventory MBI
+LEFT JOIN dbo.Manufacturing_Orders_Detail MOD
+ON MBI.item_id = MOD.component_id
+LEFT JOIN Manufacturing_Orders MO
+ON MOD.mo_id = MO.mo_id
+LEFT JOIN Items_Custom_Fields ICF
+ON MBI.item_id = ICF.item_id
+LEFT JOIN Items I
+ON MBI.item_id = I.item_id
+WHERE MBI.item_id LIKE '2%' AND MO.status = 'Released' AND MBI.exp > GETDATE() - 89 AND MO.completed_qty = 0
+
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
