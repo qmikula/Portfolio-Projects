@@ -1,0 +1,128 @@
+WITH mo AS (
+    SELECT
+        mo.start_date,
+        mo.mo_id,
+        mod.component_id,
+        i.[description],
+        CASE
+            WHEN mo.[status] = 'Closed' AND mo.completed_qty > 0 THEN mod.mo_completed_qty + mod.mo_scrapped_qty
+            WHEN mo.[status] = 'Released' THEN mod.mo_required_qty
+            WHEN mo.[status] = 'Inactive' AND mo.start_date >= CAST(DATEADD(DAY, -5, GETDATE())AS DATE) THEN mod.mo_required_qty
+            ELSE 0
+        END AS qty,
+		i.cost_average
+    FROM
+        Manufacturing_Orders mo 
+    LEFT JOIN
+        Manufacturing_Orders_Detail mod ON mo.mo_id = mod.mo_id
+    LEFT JOIN
+        Items i ON mod.component_id = i.item_id
+    WHERE
+        mo.start_date BETWEEN CAST(DATEADD(MONTH, -12, GETDATE()) AS DATE) AND CAST(DATEADD(MONTH, 6, GETDATE()) AS DATE)
+        AND
+        mod.component_id LIKE '2%'
+		AND
+		mod.component_id NOT LIKE '25%'
+		AND
+		mod.component_id NOT LIKE '29%'
+		AND
+		mod.component_id NOT LIKE '%00629'
+),
+
+last_12_mo AS (
+    SELECT
+        TOP 30 component_id,
+        mo.description,
+        COUNT(DISTINCT mo_id) AS num_mo,
+        SUM(qty) AS qty,
+		(SUM(qty) * i.cost_average) AS cost,
+        ROW_NUMBER() OVER (ORDER BY SUM(qty) DESC) AS rank
+    FROM
+        mo
+	LEFT JOIN Items i
+	ON mo.component_id = i.item_id
+    WHERE
+        start_date BETWEEN CAST(DATEADD(MONTH, -12, GETDATE()) AS DATE) AND CAST(GETDATE() AS DATE)
+    GROUP BY
+        component_id,
+        mo.description,
+		i.cost_average
+    ORDER BY
+        SUM(qty) DESC
+),
+
+last_6_mo AS (
+    SELECT
+        TOP 30 component_id,
+        mo.description,
+        COUNT(DISTINCT mo_id) AS num_mo,
+        SUM(qty) AS qty,
+		(SUM(qty) * i.cost_average) AS cost,
+        ROW_NUMBER() OVER (ORDER BY SUM(qty) DESC) AS rank
+    FROM
+        mo
+	LEFT JOIN Items i
+	ON mo.component_id = i.item_id
+    WHERE
+        start_date BETWEEN CAST(DATEADD(MONTH, -6, GETDATE()) AS DATE) AND CAST(GETDATE() AS DATE)
+    GROUP BY
+        component_id,
+        mo.description,
+		i.cost_average
+    ORDER BY
+        SUM(qty) DESC
+),
+
+next_6_mo AS (
+    SELECT
+        TOP 30 component_id,
+        mo.description,
+        COUNT(DISTINCT mo_id) AS num_mo,
+        SUM(qty) AS qty,
+		(SUM(qty) * i.cost_average) AS cost,
+        ROW_NUMBER() OVER (ORDER BY SUM(qty) DESC) AS rank
+    FROM
+        mo
+	LEFT JOIN Items i
+	ON mo.component_id = i.item_id
+    WHERE
+        start_date BETWEEN CAST(GETDATE() AS DATE) AND CAST(DATEADD(MONTH, 6, GETDATE()) AS DATE)
+    GROUP BY
+        component_id,
+        mo.description,
+		i.cost_average
+    ORDER BY
+        SUM(qty) DESC
+),
+
+last_and_next_6_mo AS (
+    SELECT
+        TOP 50 component_id,
+        mo.description,
+        COUNT(DISTINCT mo_id) AS num_mo,
+        SUM(qty) AS qty,
+		(SUM(qty) * i.cost_average) AS cost,
+        ROW_NUMBER() OVER (ORDER BY SUM(qty) DESC) AS rank
+    FROM
+        mo
+	LEFT JOIN Items i
+	ON mo.component_id = i.item_id
+    WHERE
+        start_date BETWEEN CAST(DATEADD(MONTH, -6, GETDATE()) AS DATE) AND CAST(DATEADD(MONTH, 6, GETDATE()) AS DATE)
+    GROUP BY
+        component_id,
+        mo.description,
+		i.cost_average
+    ORDER BY
+        SUM(qty) DESC
+)
+
+SELECT 'last_12_months' AS time_period, * FROM last_12_mo
+UNION ALL
+SELECT 'last_6_mo' AS time_period, * FROM last_6_mo
+UNION ALL
+SELECT 'next_6_months' AS time_period, * FROM next_6_mo
+UNION ALL
+SELECT 'last_and_next_6_months' AS time_period, * FROM last_and_next_6_mo
+
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
