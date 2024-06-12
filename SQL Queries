@@ -1,3 +1,4 @@
+--------------------------Query for Top Ingredients Used in Different Time Periods--------------------------------
 WITH mo AS (
     SELECT
         mo.start_date,
@@ -126,3 +127,119 @@ UNION ALL
 SELECT 'last_and_next_6_months' AS time_period, * FROM last_and_next_6_mo
 
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+--------------------------View for Rolling Six Month Sales--------------------------------
+CREATE VIEW v_Rolling_Six_Months_Sales AS
+    WITH ss_sales AS
+        (
+            SELECT
+                CONCAT(agg_sales.order_year, '-', agg_sales.order_month) AS 'date',
+                agg_sales.item_id,
+                agg_sales.qty,
+                ISNULL((agg_sales.amount + agg_sales.discount), 0) AS net_amount,
+                agg_sales.sales_channel,
+                agg_sales.brand,
+                i.category,
+                i.subcategory,
+                i.[count],
+                i.packaging_type
+            FROM
+                (
+                    SELECT
+                        YEAR(order_date) AS order_year,
+                        MONTH(order_date) AS order_month,
+                        item_id,
+                        SUM(qty) AS qty,
+                        SUM(order_line_amount) AS amount,
+                        SUM(order_line_discount) AS discount,
+                        store_group AS brand,
+                        'DTC' AS sales_channel
+                    FROM
+                        Ship_Station_Sales
+                    WHERE
+                        order_date >= DATEADD(MONTH, -6, GETDATE())
+                        AND
+                        item_id NOT LIKE '%Apparerl%'
+                        AND
+                        item_id NOT LIKE 'Needs Attention'
+                        AND
+                        RIGHT(item_id, 2) != 'SL'
+                    GROUP BY
+                        YEAR(order_date),
+                        MONTH(order_date),
+                        store_group,
+                        item_id
+                ) agg_sales
+            LEFT JOIN
+                Items_Custom_Fields i ON agg_sales.item_id = i.item_id
+        ),
+
+    qb_sales AS
+        (
+            SELECT
+                CONCAT(agg_sales.order_year, '-', agg_sales.order_month) AS 'date',
+                agg_sales.item_id,
+                agg_sales.qty,
+                (agg_sales.amount + agg_sales.discount) AS net_amount,
+                i.sales_channel,
+                i.customer AS brand,
+                i.category,
+                i.subcategory,
+                i.[count],
+                i.packaging_type
+            FROM
+                (
+                    SELECT
+                        YEAR(so.txn_date) AS order_year,
+                        MONTH(so.txn_date) AS order_month,
+                        CASE
+                            WHEN item_id LIKE '71%' THEN item_id
+                            ELSE LEFT(item_id, 8)
+                        END AS item_id,
+                        SUM(so.qty) AS qty,
+                        SUM(so.amount) AS amount,
+                        0 AS discount
+                    FROM
+                        Sales_Orders so
+                    LEFT JOIN
+                        (SELECT customer_id, customer_name FROM Customers) c ON so.customer_id = c.customer_id
+                    WHERE
+                        item_id LIKE '7%'
+                        AND
+                        txn_date >= DATEADD(MONTH, -6, GETDATE())
+                        AND
+                        c.customer_name NOT LIKE '%Global Widget%'
+                        AND
+                        txn_num != '42214'
+                    GROUP BY
+                        YEAR(so.txn_date),
+                        MONTH(so.txn_date),
+                        item_id
+                ) agg_sales
+            LEFT JOIN
+                Items_Custom_Fields i ON agg_sales.item_id = i.item_id
+        )
+
+    SELECT
+        final_dataset.date,
+        final_dataset.item_id,
+        i.[description],
+        final_dataset.qty,
+        final_dataset.net_amount,
+        final_dataset.sales_channel,
+        final_dataset.brand,
+        final_dataset.category,
+        final_dataset.subcategory,
+        final_dataset.[count],
+        final_dataset.packaging_type
+    FROM
+        (
+            SELECT * FROM ss_sales
+            UNION ALL
+            SELECT * FROM qb_sales
+        ) final_dataset
+    LEFT JOIN
+        (SELECT item_id, [description] FROM Items) i ON final_dataset.item_id = i.item_id;
+
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
