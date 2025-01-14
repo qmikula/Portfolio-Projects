@@ -243,7 +243,7 @@ CREATE VIEW v_Rolling_Six_Months_Sales AS
 
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
---------------------------COGs Variance Alert +/-7%--------------------------------
+--------------------------Query for Expiring Ingredients--------------------------------
 SELECT
 	MOD.mo_id,
         MBI.item_id,
@@ -317,7 +317,7 @@ WHERE MBI.item_id LIKE '2%' AND MO.status = 'Released' AND MBI.exp > GETDATE() -
 
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
---------------------------Query for Expiring Ingredients--------------------------------
+--------------------------COGs Variance Alert--------------------------------
 WITH PO AS (
 	SELECT
 	   mpd.po_id
@@ -343,7 +343,7 @@ WITH PO AS (
 	FROM prod.mi_po_detail MPD
 	LEFT JOIN prod.mi_po_header MPH
 		ON MPD.po_id = MPH.po_id
-	WHERE order_date >= DATEADD(MONTH, -2, GETDATE())
+	WHERE item_id IS NOT NULL AND order_date >= DATEADD(MONTH, -2, GETDATE())
 ),
 RecentOrders AS (
     SELECT
@@ -384,15 +384,23 @@ SELECT
     MRC.item_id,
     ROUND(MRC.most_recent_cost,3) AS most_recent_cost,
     ROUND(A.historical_avg,3) AS historical_avg,
-	ROUND((ABS(MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100),3) AS percent_change,
+	ROUND(((MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100),2) AS percent_change,
     CASE
-        WHEN (ABS(MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100) > 7 THEN 'FLAG'
+        WHEN ((MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100) >= 7 THEN 'FLAG'
         ELSE 'OK'
     END AS status
 FROM MostRecentCosts MRC
 JOIN Averages A
     ON MRC.item_id = A.item_id
 )
-SELECT *
-FROM FlaggedChanges
+SELECT
+	FC.item_id,
+	I.description,
+	most_recent_cost,
+	historical_avg,
+	percent_change,
+	status
+FROM FlaggedChanges FC
+LEFT JOIN Items I
+ON FC.item_id = I.item_id
 WHERE status = 'FLAG'
