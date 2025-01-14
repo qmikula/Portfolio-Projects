@@ -243,7 +243,7 @@ CREATE VIEW v_Rolling_Six_Months_Sales AS
 
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
---------------------------Query for Expiring Ingredients--------------------------------
+--------------------------COGs Variance Alert +/-7%--------------------------------
 SELECT
 	MOD.mo_id,
         MBI.item_id,
@@ -317,3 +317,82 @@ WHERE MBI.item_id LIKE '2%' AND MO.status = 'Released' AND MBI.exp > GETDATE() -
 
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
+--------------------------Query for Expiring Ingredients--------------------------------
+WITH PO AS (
+	SELECT
+	   mpd.po_id
+      ,po_detail_id
+      ,detail_type
+      ,po_detail_status
+      ,invoiced
+	  ,mph.order_date
+      ,item_id
+      ,ordered_qty
+      ,received_qty
+      ,price
+      ,cost
+      ,mpd.invoiced_qty
+      ,invoiced_cost
+      ,description
+      ,purchase_um
+      ,um_conversion
+      ,mo_id
+      ,mo_detail_id
+      ,initial_due_date
+      ,real_due_date
+	FROM prod.mi_po_detail MPD
+	LEFT JOIN prod.mi_po_header MPH
+		ON MPD.po_id = MPH.po_id
+	WHERE order_date >= DATEADD(MONTH, -2, GETDATE())
+),
+RecentOrders AS (
+    SELECT
+        item_id,
+        MAX(order_date) AS most_recent_date
+    FROM PO
+    GROUP BY item_id
+),
+HistoricalOrders AS (
+    SELECT
+        RO.item_id,
+        PO.price AS unit_cost,
+        PO.order_date
+    FROM PO
+    LEFT JOIN RecentOrders RO
+        ON po.item_id = ro.item_id
+	WHERE PO.order_date < ro.most_recent_date
+),
+Averages AS (
+    SELECT
+        item_id,
+        AVG(unit_cost) AS historical_avg
+    FROM HistoricalOrders
+    GROUP BY item_id
+	HAVING AVG(unit_Cost) >= 0.000001
+),
+MostRecentCosts AS (
+    SELECT
+        PO.item_id,
+        PO.price AS most_recent_cost
+    FROM PO
+    JOIN RecentOrders RO
+        ON po.item_id = ro.item_id
+       AND po.order_date = ro.most_recent_date
+),
+FlaggedChanges AS (
+SELECT
+    MRC.item_id,
+    ROUND(MRC.most_recent_cost,3) AS most_recent_cost,
+    ROUND(A.historical_avg,3) AS historical_avg,
+	ROUND((ABS(MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100),3) AS percent_change,
+    CASE
+        WHEN (ABS(MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100) > 7 THEN 'FLAG'
+        ELSE 'OK'
+    END AS status
+FROM MostRecentCosts MRC
+JOIN Averages A
+    ON MRC.item_id = A.item_id
+)
+SELECT *
+FROM FlaggedChanges
+WHERE status = 'FLAG'
