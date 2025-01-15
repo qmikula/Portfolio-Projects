@@ -384,7 +384,7 @@ SELECT
     MRC.item_id,
     ROUND(MRC.most_recent_cost,3) AS most_recent_cost,
     ROUND(A.historical_avg,3) AS historical_avg,
-	ROUND(((MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100),2) AS percent_change,
+	FORMAT((MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100, '0.##') AS percent_change,
     CASE
         WHEN ((MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100) >= 7 THEN 'FLAG'
         ELSE 'OK'
@@ -394,12 +394,11 @@ JOIN Averages A
     ON MRC.item_id = A.item_id
 )
 SELECT
-	FC.item_id,
-	I.description,
-	most_recent_cost,
-	historical_avg,
-	percent_change,
-	status
+	FC.item_id AS Item_ID,
+	I.description AS Description,
+	most_recent_cost AS Recent_Cost,
+	historical_avg AS Average_Cost,
+	CONCAT(percent_change,'%') AS Percent_Change
 FROM FlaggedChanges FC
 LEFT JOIN Items I
 ON FC.item_id = I.item_id
