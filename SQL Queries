@@ -343,13 +343,14 @@ WITH PO AS (
 	FROM prod.mi_po_detail MPD
 	LEFT JOIN prod.mi_po_header MPH
 		ON MPD.po_id = MPH.po_id
-	WHERE item_id IS NOT NULL AND order_date >= DATEADD(MONTH, -2, GETDATE())
+	WHERE item_id IS NOT NULL AND price > 0 AND order_date >= DATEADD(MONTH, -12, GETDATE())
 ),
 RecentOrders AS (
     SELECT
         item_id,
         MAX(order_date) AS most_recent_date
     FROM PO
+	WHERE order_date >= DATEADD(DAY,-14, GETDATE())
     GROUP BY item_id
 ),
 HistoricalOrders AS (
@@ -368,7 +369,7 @@ Averages AS (
         AVG(unit_cost) AS historical_avg
     FROM HistoricalOrders
     GROUP BY item_id
-	HAVING AVG(unit_Cost) >= 0.000001
+	HAVING AVG(unit_Cost) >= 0.0000001
 ),
 MostRecentCosts AS (
     SELECT
@@ -386,7 +387,7 @@ SELECT
     ROUND(A.historical_avg,3) AS historical_avg,
 	FORMAT((MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100, '0.#') AS percent_change,
     CASE
-        WHEN ((MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100) >= 7 THEN 'FLAG'
+        WHEN ((MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100) >= 12 THEN 'FLAG'
         ELSE 'OK'
     END AS status
 FROM MostRecentCosts MRC
