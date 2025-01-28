@@ -350,7 +350,7 @@ RecentOrders AS (
         item_id,
         MAX(order_date) AS most_recent_date
     FROM PO
-	WHERE order_date >= DATEADD(DAY,-14, GETDATE())
+	WHERE order_date >= DATEADD(DAY,-7, GETDATE())
     GROUP BY item_id
 ),
 HistoricalOrders AS (
