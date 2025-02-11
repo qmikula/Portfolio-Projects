@@ -22,21 +22,20 @@ WITH mo AS (
         mo.start_date BETWEEN CAST(DATEADD(MONTH, -12, GETDATE()) AS DATE) AND CAST(DATEADD(MONTH, 6, GETDATE()) AS DATE)
         AND
         mod.component_id LIKE '2%'
-		AND
-		mod.component_id NOT LIKE '25%'
-		AND
-		mod.component_id NOT LIKE '29%'
-		AND
-		mod.component_id NOT LIKE '%00629'
+	AND
+	mod.component_id NOT LIKE '25%'
+	AND
+	mod.component_id NOT LIKE '29%'
+	AND
+	mod.component_id NOT LIKE '%00629'
 ),
-
 last_12_mo AS (
     SELECT
         TOP 30 component_id,
         mo.description,
         COUNT(DISTINCT mo_id) AS num_mo,
         SUM(qty) AS qty,
-		(SUM(qty) * i.cost_average) AS cost,
+	(SUM(qty) * i.cost_average) AS cost,
         ROW_NUMBER() OVER (ORDER BY SUM(qty) DESC) AS rank
     FROM
         mo
@@ -47,18 +46,17 @@ last_12_mo AS (
     GROUP BY
         component_id,
         mo.description,
-		i.cost_average
+	i.cost_average
     ORDER BY
         SUM(qty) DESC
 ),
-
 last_6_mo AS (
     SELECT
         TOP 30 component_id,
         mo.description,
         COUNT(DISTINCT mo_id) AS num_mo,
         SUM(qty) AS qty,
-		(SUM(qty) * i.cost_average) AS cost,
+	(SUM(qty) * i.cost_average) AS cost,
         ROW_NUMBER() OVER (ORDER BY SUM(qty) DESC) AS rank
     FROM
         mo
@@ -69,55 +67,50 @@ last_6_mo AS (
     GROUP BY
         component_id,
         mo.description,
-		i.cost_average
+	i.cost_average
     ORDER BY
         SUM(qty) DESC
 ),
-
 next_6_mo AS (
     SELECT
         TOP 30 component_id,
         mo.description,
         COUNT(DISTINCT mo_id) AS num_mo,
         SUM(qty) AS qty,
-		(SUM(qty) * i.cost_average) AS cost,
+	(SUM(qty) * i.cost_average) AS cost,
         ROW_NUMBER() OVER (ORDER BY SUM(qty) DESC) AS rank
-    FROM
-        mo
-	LEFT JOIN Items i
+    FROM mo
+    LEFT JOIN Items i
 	ON mo.component_id = i.item_id
     WHERE
         start_date BETWEEN CAST(GETDATE() AS DATE) AND CAST(DATEADD(MONTH, 6, GETDATE()) AS DATE)
     GROUP BY
         component_id,
         mo.description,
-		i.cost_average
+	i.cost_average
     ORDER BY
         SUM(qty) DESC
 ),
-
 last_and_next_6_mo AS (
     SELECT
         TOP 50 component_id,
         mo.description,
         COUNT(DISTINCT mo_id) AS num_mo,
         SUM(qty) AS qty,
-		(SUM(qty) * i.cost_average) AS cost,
+	(SUM(qty) * i.cost_average) AS cost,
         ROW_NUMBER() OVER (ORDER BY SUM(qty) DESC) AS rank
-    FROM
-        mo
-	LEFT JOIN Items i
+    FROM mo
+    LEFT JOIN Items i
 	ON mo.component_id = i.item_id
     WHERE
         start_date BETWEEN CAST(DATEADD(MONTH, -6, GETDATE()) AS DATE) AND CAST(DATEADD(MONTH, 6, GETDATE()) AS DATE)
     GROUP BY
         component_id,
         mo.description,
-		i.cost_average
+	i.cost_average
     ORDER BY
         SUM(qty) DESC
 )
-
 SELECT 'last_12_months' AS time_period, * FROM last_12_mo
 UNION ALL
 SELECT 'last_6_mo' AS time_period, * FROM last_6_mo
@@ -173,7 +166,6 @@ CREATE VIEW v_Rolling_Six_Months_Sales AS
             LEFT JOIN
                 Items_Custom_Fields i ON agg_sales.item_id = i.item_id
         ),
-
     qb_sales AS
         (
             SELECT
@@ -208,7 +200,7 @@ CREATE VIEW v_Rolling_Six_Months_Sales AS
                         AND
                         txn_date >= DATEADD(MONTH, -6, GETDATE())
                         AND
-                        c.customer_name NOT LIKE '%Global Widget%'
+                        c.customer_name NOT LIKE '%store1%'
                         AND
                         txn_num != '42214'
                     GROUP BY
@@ -285,7 +277,7 @@ SELECT
 	MO.completed_qty,
 	MO.status,
 	MO.work_center,
-    MO.bom_item_id,
+    	MO.bom_item_id,
 	ICF.sales_channel,
 	ICF.customer,
 	ICF.category,
@@ -297,7 +289,7 @@ SELECT
 	ICF.raw_subcategory,
 	CONCAT(MBI.item_id,' | ',MBI.description) AS 'ItemIDDescription',
 	CONCAT(MOD.mo_id,' | ',MO.memo) AS MOIDMemo,
-    MOD.table_last_updated,
+    	MOD.table_last_updated,
 	CASE
 		WHEN MBI.exp LIKE '2099%' THEN 'Yes'
 		ELSE 'No'
@@ -306,13 +298,13 @@ SELECT
 	(MBI.qty * I.cost_average) AS qty_value
 FROM dbo.Misys_Bin_Inventory MBI
 LEFT JOIN dbo.Manufacturing_Orders_Detail MOD
-ON MBI.item_id = MOD.component_id
+	ON MBI.item_id = MOD.component_id
 LEFT JOIN Manufacturing_Orders MO
-ON MOD.mo_id = MO.mo_id
+	ON MOD.mo_id = MO.mo_id
 LEFT JOIN Items_Custom_Fields ICF
-ON MBI.item_id = ICF.item_id
+	ON MBI.item_id = ICF.item_id
 LEFT JOIN Items I
-ON MBI.item_id = I.item_id
+	ON MBI.item_id = I.item_id
 WHERE MBI.item_id LIKE '2%' AND MO.status = 'Released' AND MBI.exp > GETDATE() - 89 AND MO.completed_qty = 0
 
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -320,26 +312,26 @@ WHERE MBI.item_id LIKE '2%' AND MO.status = 'Released' AND MBI.exp > GETDATE() -
 --------------------------COGs Variance Alert--------------------------------
 WITH PO AS (
 	SELECT
-	   mpd.po_id
-      ,po_detail_id
-      ,detail_type
-      ,po_detail_status
-      ,invoiced
-	  ,mph.order_date
-      ,item_id
-      ,ordered_qty
-      ,received_qty
-      ,price
-      ,cost
-      ,mpd.invoiced_qty
-      ,invoiced_cost
-      ,description
-      ,purchase_um
-      ,um_conversion
-      ,mo_id
-      ,mo_detail_id
-      ,initial_due_date
-      ,real_due_date
+		mpd.po_id
+		,po_detail_id
+		,detail_type
+		,po_detail_status
+		,invoiced
+		,mph.order_date
+		,item_id
+		,ordered_qty
+		,received_qty
+		,price
+		,cost
+		,mpd.invoiced_qty
+		,invoiced_cost
+		,description
+		,purchase_um
+		,um_conversion
+		,mo_id
+		,mo_detail_id
+		,initial_due_date
+		,real_due_date
 	FROM prod.mi_po_detail MPD
 	LEFT JOIN prod.mi_po_header MPH
 		ON MPD.po_id = MPH.po_id
@@ -382,9 +374,9 @@ MostRecentCosts AS (
 ),
 FlaggedChanges AS (
 SELECT
-    MRC.item_id,
-    ROUND(MRC.most_recent_cost,3) AS most_recent_cost,
-    ROUND(A.historical_avg,3) AS historical_avg,
+	MRC.item_id,
+	ROUND(MRC.most_recent_cost,3) AS most_recent_cost,
+	ROUND(A.historical_avg,3) AS historical_avg,
 	FORMAT((MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100, '0.#') AS percent_change,
     CASE
         WHEN ((MRC.most_recent_cost - A.historical_avg) / A.historical_avg * 100) >= 12 THEN 'FLAG'
@@ -392,7 +384,7 @@ SELECT
     END AS status
 FROM MostRecentCosts MRC
 JOIN Averages A
-    ON MRC.item_id = A.item_id
+	ON MRC.item_id = A.item_id
 )
 SELECT
 	FC.item_id AS Item_ID,
@@ -402,5 +394,157 @@ SELECT
 	CONCAT(percent_change,'%') AS Percent_Change
 FROM FlaggedChanges FC
 LEFT JOIN Items I
-ON FC.item_id = I.item_id
+	ON FC.item_id = I.item_id
 WHERE status = 'FLAG'
+
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+--------------------------FB ADs LTV Analysis--------------------------------
+
+WITH existing_customers AS (
+SELECT
+	DISTINCT customer_email
+FROM Ship_Station_Sales
+WHERE order_date < '2024-04-01'
+AND
+order_date > '2023-04-01'
+AND
+store_group = 'store1'
+AND
+customer_email IN ('customeremail1', 'customeremail2', 'customeremail3')
+),
+q2_customers AS (
+SELECT
+	DISTINCT customer_email
+FROM Ship_Station_Sales
+WHERE order_date >= '2024-04-01'
+AND
+order_date < '2024-07-01'
+AND
+store_group = 'store1'
+AND
+customer_email IN ('customeremail1', 'customeremail2', 'customeremail3')
+),
+sales AS (
+SELECT
+	SSS.item_id,
+	order_id,
+	order_num,
+	order_date,
+	order_status,
+	store_group,
+	qty,
+	order_line_amount,
+	order_line_discount_amount,
+	order_line_shipping_amount,
+	(I.cost_average*qty) AS order_cost,
+	customer_id,
+	customer_email
+FROM Ship_Station_Sales SSS
+LEFT JOIN Items I
+	ON SSS.item_id = I.item_id
+WHERE order_date >= '2024-04-01' AND store_group = 'store1' AND customer_email IN ('customeremail1', 'customeremail2', 'customeremail3')
+),
+fixed_Sales AS (
+SELECT
+	order_id,
+	order_num,
+	order_date,
+	order_status,
+	store_group,
+	qty,
+	(order_line_amount+order_line_discount_amount+order_line_shipping_amount) AS order_total,
+	order_cost,
+	customer_id,
+	customer_email
+FROM sales
+WHERE order_date >= '2024-04-01'
+),
+customer_ltv AS (
+    SELECT 
+        q.customer_email,
+        CASE 
+            WHEN e.customer_email IS NOT NULL THEN 'Existing' 
+            ELSE 'New' 
+        END AS customer_type,
+        COUNT(fs.order_id) AS total_orders,
+        SUM(fs.order_total) AS total_revenue,
+	SUM(order_cost) as total_cost,
+        AVG(fs.order_total) AS avg_order_value,
+        MIN(fs.order_date) AS first_order_date,
+        MAX(fs.order_date) AS last_order_date,
+        DATEDIFF(MONTH, MIN(fs.order_date), MAX(fs.order_date)) AS customer_lifespan_months,
+	CASE 
+		WHEN DATEDIFF(MONTH, MIN(fs.order_date), MAX(fs.order_date)) > 0 THEN 
+		(SUM(fs.order_total) / DATEDIFF(MONTH, MIN(fs.order_date), MAX(fs.order_date)))
+            ELSE 
+                SUM(fs.order_total)
+        END AS monthly_spend,
+		COALESCE(
+		(SELECT STRING_AGG(CAST(store_group AS NVARCHAR(MAX)), ', ') 
+    FROM (SELECT DISTINCT fs.store_group 
+		FROM fixed_sales fs 
+		WHERE fs.customer_email = q.customer_email) AS distinct_stores), 
+		'No Orders'
+        ) AS stores_ordered_from
+    FROM q2_customers q
+    LEFT JOIN existing_customers e
+	ON q.customer_email = e.customer_email
+    LEFT JOIN fixed_sales fs
+        ON q.customer_email = fs.customer_email
+        AND fs.order_date >= '2024-04-01' AND fs.order_date <= '2025-01-31'
+    GROUP BY q.customer_email, e.customer_email
+),
+data AS (
+SELECT
+	customer_email,
+	customer_type AS q2_customer,
+	total_orders,
+	total_revenue,
+	total_cost AS total_cogs,
+	(total_revenue-total_cost) AS total_gross_profit,
+	CASE
+		WHEN MONTH(first_order_date) = 4 THEN 150.09
+		WHEN MONTH(first_order_date) = 5 THEN 125.50
+		WHEN MONTH(first_order_date) = 6 THEN 174
+	END AS ad_cost_per_customer_all,
+	CASE
+		WHEN MONTH(first_order_date) = 4 AND customer_type = 'New' THEN 690.43
+		WHEN MONTH(first_order_date) = 5 AND customer_type = 'New' THEN 354.41
+		WHEN MONTH(first_order_date) = 6 AND customer_type = 'New' THEN 458.73
+	END AS ad_cost_per_customer_new,
+	avg_order_value,
+	first_order_date,
+	last_order_date,
+	customer_lifespan_months,
+	monthly_spend,
+	stores_ordered_from
+FROM customer_ltv
+WHERE customer_email IS NOT NULL AND customer_email != ''
+)
+SELECT
+	customer_email,
+	q2_customer,
+	total_orders,
+	total_revenue,
+	total_cogs,
+	total_gross_profit,
+	ad_cost_per_customer_all,
+	ad_cost_per_customer_new,
+	CASE
+		WHEN MONTH(first_order_date) = 4 THEN (total_gross_profit - ad_cost_per_customer_all)
+		WHEN MONTH(first_order_date) = 5 THEN (total_gross_profit - ad_cost_per_customer_all)
+		WHEN MONTH(first_order_date) = 6 THEN (total_gross_profit - ad_cost_per_customer_all)
+	END AS ltv_all,
+	CASE
+		WHEN MONTH(first_order_date) = 4 AND q2_customer = 'New' THEN (total_gross_profit - ad_cost_per_customer_new)
+		WHEN MONTH(first_order_date) = 5 AND q2_customer = 'New' THEN (total_gross_profit - ad_cost_per_customer_new)
+		WHEN MONTH(first_order_date) = 6 AND q2_customer = 'New' THEN  (total_gross_profit - ad_cost_per_customer_new)
+	END AS ltv_new,
+	avg_order_value,
+	first_order_date,
+	last_order_date,
+	customer_lifespan_months,
+	monthly_spend,
+	stores_ordered_from
+FROM data
