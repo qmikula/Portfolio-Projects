@@ -546,5 +546,9 @@ SELECT
 	last_order_date,
 	customer_lifespan_months,
 	monthly_spend,
-	stores_ordered_from
+	stores_ordered_from,
+	CASE
+		WHEN last_order_date >= '2024-10-31' THEN 'Churned'
+		ELSE 'Active'
+	END AS churn_status
 FROM data
