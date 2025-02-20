@@ -469,27 +469,26 @@ customer_ltv AS (
         END AS customer_type,
         COUNT(fs.order_id) AS total_orders,
         SUM(fs.order_total) AS total_revenue,
-	SUM(order_cost) as total_cost,
+		SUM(order_cost) as total_cost,
         AVG(fs.order_total) AS avg_order_value,
         MIN(fs.order_date) AS first_order_date,
         MAX(fs.order_date) AS last_order_date,
         DATEDIFF(MONTH, MIN(fs.order_date), MAX(fs.order_date)) AS customer_lifespan_months,
-	CASE 
-		WHEN DATEDIFF(MONTH, MIN(fs.order_date), MAX(fs.order_date)) > 0 THEN 
-		(SUM(fs.order_total) / DATEDIFF(MONTH, MIN(fs.order_date), MAX(fs.order_date)))
+		CASE 
+            WHEN DATEDIFF(MONTH, MIN(fs.order_date), MAX(fs.order_date)) > 0 THEN 
+                (SUM(fs.order_total) / DATEDIFF(MONTH, MIN(fs.order_date), MAX(fs.order_date)))
             ELSE 
                 SUM(fs.order_total)
         END AS monthly_spend,
 		COALESCE(
-		(SELECT STRING_AGG(CAST(store_group AS NVARCHAR(MAX)), ', ') 
-    FROM (SELECT DISTINCT fs.store_group 
-		FROM fixed_sales fs 
-		WHERE fs.customer_email = q.customer_email) AS distinct_stores), 
-		'No Orders'
+            (SELECT STRING_AGG(CAST(store_group AS NVARCHAR(MAX)), ', ') 
+             FROM (SELECT DISTINCT fs.store_group 
+                   FROM fixed_sales fs 
+                   WHERE fs.customer_email = q.customer_email) AS distinct_stores), 
+            'No Orders'
         ) AS stores_ordered_from
     FROM q2_customers q
-    LEFT JOIN existing_customers e
-	ON q.customer_email = e.customer_email
+    LEFT JOIN existing_customers e ON q.customer_email = e.customer_email
     LEFT JOIN fixed_sales fs
         ON q.customer_email = fs.customer_email
         AND fs.order_date >= '2024-04-01' AND fs.order_date <= '2025-01-31'
@@ -509,17 +508,20 @@ SELECT
 		WHEN MONTH(first_order_date) = 6 THEN 174
 	END AS ad_cost_per_customer_all,
 	CASE
-		WHEN MONTH(first_order_date) = 4 AND customer_type = 'New' THEN 690.43
-		WHEN MONTH(first_order_date) = 5 AND customer_type = 'New' THEN 354.41
-		WHEN MONTH(first_order_date) = 6 AND customer_type = 'New' THEN 458.73
-	END AS ad_cost_per_customer_new,
+		WHEN MONTH(first_order_date) = 4 AND customer_type = 'New' THEN 621.39
+		WHEN MONTH(first_order_date) = 5 AND customer_type = 'New' THEN 318.97
+		WHEN MONTH(first_order_date) = 6 AND customer_type = 'New' THEN 412.85
+		WHEN MONTH(first_order_date) = 4 AND customer_type = 'Existing' THEN 19.18
+		WHEN MONTH(first_order_date) = 5 AND customer_type = 'Existing' THEN 19.44
+		WHEN MONTH(first_order_date) = 6 AND customer_type = 'Existing' THEN 28.03 --70%(New)/30%(Existing) Breakdown
+	END AS ad_cost_per_customer_distributed,
 	avg_order_value,
 	first_order_date,
 	last_order_date,
 	customer_lifespan_months,
 	monthly_spend,
 	stores_ordered_from
-FROM customer_ltv
+	FROM customer_ltv
 WHERE customer_email IS NOT NULL AND customer_email != ''
 )
 SELECT
@@ -530,17 +532,20 @@ SELECT
 	total_cogs,
 	total_gross_profit,
 	ad_cost_per_customer_all,
-	ad_cost_per_customer_new,
+	ad_cost_per_customer_distributed,
 	CASE
 		WHEN MONTH(first_order_date) = 4 THEN (total_gross_profit - ad_cost_per_customer_all)
 		WHEN MONTH(first_order_date) = 5 THEN (total_gross_profit - ad_cost_per_customer_all)
 		WHEN MONTH(first_order_date) = 6 THEN (total_gross_profit - ad_cost_per_customer_all)
 	END AS ltv_all,
 	CASE
-		WHEN MONTH(first_order_date) = 4 AND q2_customer = 'New' THEN (total_gross_profit - ad_cost_per_customer_new)
-		WHEN MONTH(first_order_date) = 5 AND q2_customer = 'New' THEN (total_gross_profit - ad_cost_per_customer_new)
-		WHEN MONTH(first_order_date) = 6 AND q2_customer = 'New' THEN  (total_gross_profit - ad_cost_per_customer_new)
-	END AS ltv_new,
+		WHEN MONTH(first_order_date) = 4 AND q2_customer = 'New' THEN (total_gross_profit - ad_cost_per_customer_distributed)
+		WHEN MONTH(first_order_date) = 5 AND q2_customer = 'New' THEN (total_gross_profit - ad_cost_per_customer_distributed)
+		WHEN MONTH(first_order_date) = 6 AND q2_customer = 'New' THEN  (total_gross_profit - ad_cost_per_customer_distributed)
+		WHEN MONTH(first_order_date) = 4 AND q2_customer = 'Existing' THEN (total_gross_profit - ad_cost_per_customer_distributed)
+		WHEN MONTH(first_order_date) = 5 AND q2_customer = 'Existing' THEN (total_gross_profit - ad_cost_per_customer_distributed)
+		WHEN MONTH(first_order_date) = 6 AND q2_customer = 'Existing' THEN  (total_gross_profit - ad_cost_per_customer_distributed)
+	END AS ltv_distributed,
 	avg_order_value,
 	first_order_date,
 	last_order_date,
