@@ -552,3 +552,89 @@ SELECT
 		ELSE 'Active'
 	END AS churn_status
 FROM data
+
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+--------------------------Released MOs--------------------------------
+WITH CTE AS (
+    SELECT
+        mo.build_item_id AS 'item_id',
+        mo.memo AS 'description',
+        mo.mo_id,
+        mo.start_date,
+		mo.end_date,
+        mo.ordered_qty,
+        CASE
+            WHEN mo.work_center = 'GM01' AND (subcategory <> 'D9' AND ordered_qty >= 60000) THEN 'GM12'
+            ELSE mo.work_center
+        END AS work_center,
+        CASE
+            WHEN mo.build_item_id LIKE '6%' THEN ((mo.ordered_qty - mo.completed_qty) / i.lot_size)
+            ELSE 0
+        END AS batch_qty,
+        customer AS customer_name,
+        i.packaging_type,
+        i.category,
+        i.subcategory,
+        pmo.so_num
+    FROM
+        Manufacturing_Orders mo
+    LEFT JOIN (
+        SELECT
+            i.item_id,
+            i.lot_size,
+            icf.packaging_type,
+            icf.category,
+            icf.subcategory
+        FROM
+            Items i
+        LEFT JOIN Items_Custom_Fields icf ON i.item_id = icf.item_id
+    ) i ON mo.build_item_id = i.item_id
+    LEFT JOIN (
+        SELECT
+            bom_item_id,
+            so_num,
+            ROW_NUMBER() OVER (PARTITION BY bom_item_id ORDER BY so_num) AS row_num
+        FROM prod.mi_mo_header
+        WHERE mo_status = 'Released'
+    ) pmo ON mo.bom_item_id = pmo.bom_item_id AND pmo.row_num = 1
+    WHERE
+        mo.status = 'Released'
+        AND (mo.work_center NOT IN ('DEMAND01', 'COMPLAB06', 'COMPLAB07', 'KITTING01', 'RTFORM') OR mo.work_center IS NULL)
+        AND (mo.build_item_id LIKE '6%' OR mo.build_item_id LIKE '7%')
+),
+CTE_SO AS (
+SELECT
+	txn_num,
+	MIN(ship_date) AS soonest_ship_date
+FROM Sales_Orders
+WHERE ship_date > GETDATE()
+GROUP BY txn_num
+)
+SELECT
+    item_id,
+    description,
+    mo_id,
+    start_date,
+	end_date,
+    ordered_qty,
+    CASE
+        WHEN description LIKE '%pilot%' AND work_center IN ('GM01', 'GM03', 'GM12') THEN work_center + '-P'
+        ELSE work_center
+    END AS work_center,
+    batch_qty,
+    customer_name,
+    CASE
+        WHEN description LIKE '%store_name%' AND packaging_type = 'Bottle' AND (description LIKE '%3PK%' OR description LIKE '%3-pack%') THEN 'Bottle-S'
+        WHEN packaging_type = 'Pouch' AND description LIKE '%12ct%' AND subcategory IN ('D9', 'D8') THEN 'PouchMan'
+        WHEN packaging_type = 'Pouch' AND description LIKE '%15ct%' AND subcategory IN ('D9', 'D8') THEN 'PouchMan'
+        WHEN packaging_type = 'Pouch' AND work_center = 'BAGGING06' THEN 'Bag-Wt'
+        ELSE packaging_type
+    END AS packaging_type,
+    category,
+    subcategory,
+    so_num,
+	soonest_ship_date AS ship_date
+FROM CTE
+LEFT JOIN CTE_SO
+ON CTE.so_num = CTE_SO.txn_num
